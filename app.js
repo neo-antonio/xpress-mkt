@@ -26,6 +26,7 @@ var CHDEF = [
 ];
 var PAL = ["#5b8def","#f2a65a","#5fc4a1"];
 var AUDS = [["all","Combined"],["driver","Driver"],["passenger","Passenger"]];
+var AREAS = [["all","All"],["metro","Metro Manila"],["bataan","Bataan"],["pampanga","Pampanga"],["palawan","Palawan"]];
 
 /* ---------- storage ---------- */
 function ld(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
@@ -33,7 +34,7 @@ var rows = ld("xpm_rows", []).filter(function (r) { return !r.s; }); /* drops an
 var acc = ld("xpm_access", {google:1, meta:1, appsflyer:1});
 var T = Object.assign({}, TD, ld("xpm_targets", {}));
 var theme = ld("xpm_theme", "system");
-var S = Object.assign({metaUrl:"", metaToken:"", range:"last30", cmp:"prev", aud:"all", rs:"", re:"", cs:"", ce:"", afc:{}}, ld("xpm_prefs", {}));
+var S = Object.assign({metaUrl:"", metaToken:"", range:"last30", cmp:"prev", aud:"all", area:"metro", fx:0, rs:"", re:"", cs:"", ce:"", afc:{}}, ld("xpm_prefs", {}));
 var SY = ld("xpm_sync", {});
 var AFROWS = ld("xpm_afrows", []);
 if ("at" in SY) SY = {meta: SY};
@@ -102,7 +103,7 @@ function total(aggs) { var t = Z(); aggs.forEach(function (a) { add(t, a); }); r
    Activation = booking created. Completed Ride = bookings actually completed. Failed = created minus completed. */
 var AFK = ["installs","regs","acts","value","cpi","cpr","cpa","roas","c1","c2","c3","cvr"];
 function afCan(ch) { return ch === "google" || ch === "meta"; }
-function shCan(ch) { return ch === "google" || ch === "meta" || ch === "tiktok"; }
+function shCan(ch) { return ch === "google" || ch === "meta" || ch === "tiktok" || ch === "pokkt"; }
 /* TikTok: app = Android, SKAN = iOS. Totals are app + SKAN; the split sits next to the number. */
 var SPL = {installs:["ina","ins"], regs:["rga","rgs"], acts:["aca","acs"], value:["vaa","vas"]};
 var AND = "<svg class='pi' viewBox='0 0 24 24' aria-hidden='true'><path fill='currentColor' d='M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85a.64.64 0 0 0-.83.22l-1.88 3.24a11.46 11.46 0 0 0-8.94 0L5.65 5.67a.64.64 0 0 0-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 0 0 1 18h22a10.78 10.78 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z'/></svg>";
@@ -112,7 +113,10 @@ function splHtml(a, k, u) { var s = SPL[k]; return "<small class='spl'><span tit
 function afOn(k) { var c = CHN(); return !!(c && afCan(c) && AFK.indexOf(k) > -1 && (S.afc[c] || {})[k]); }
 function afView(a) { return {spend:a.spend, impressions:a.impressions, reach:a.reach, clicks:a.clicks, installs:a.afi, regs:a.afr, acts:a.afb, value:a.afv, rides:a.afs}; }
 function mv(k, a) { var f = MT[k].f; return afOn(k) ? f(afView(a)) : f(a); }
-function na(k) { return CHN() === "google" && (k === "reach" || k === "freq"); }
+/* Metrics a channel does not report. Pokkt only sends clicks, installs and registrations (PO). */
+var NAK = {google:["reach","freq"], pokkt:["impressions","reach","freq","cpm","ctr","acts","value","roas","cpa","c3","cvr"]};
+function na(k) { var l = NAK[CHN()]; return !!l && l.indexOf(k) > -1; }
+function naT() { return "Not available for " + (NAME[CHN()] || "this channel"); }
 function afState(ch) { var o = S.afc[ch] || {}, n = AFK.filter(function (k) { return o[k]; }).length; return !afCan(ch) || !n ? "off" : n === AFK.length ? "on" : "part"; }
 function swBtn(attr, st, dis, tip) { return "<button type='button' class='swt " + st + "' " + attr + " role='switch' aria-checked='" + (st !== "off") + "'" + (dis ? " disabled title='" + tip + "'" : "") + "><span class='trk'><i></i></span><span class='st'>" + (st === "on" ? "On" : st === "part" ? "Partial" : "Off") + "</span></button>"; }
 function swSet(b, st) { b.className = "swt " + st; b.setAttribute("aria-checked", st !== "off"); b.querySelector(".st").textContent = st === "on" ? "On" : st === "part" ? "Partial" : "Off"; }
@@ -174,7 +178,7 @@ function CHN() { return route.indexOf("ch-") === 0 ? route.slice(3) : null; }
 function tgt(k) { var c = CHN(), m = MT[k]; if (c && TC[c] && has(TC[c][k])) return +TC[c][k]; return m.t && has(T[m.t]) ? +T[m.t] : null; }
 function card(k, cur, prev) {
   var m = MT[k], c = CHN();
-  if (na(k)) return "<div class='kpi na'><span>" + m.l + "</span><b title='Not available for Google Ads'>—</b><em class='dl'>Not available for Google Ads</em><div class='bm'><small>Not available for Google Ads</small></div></div>";
+  if (na(k)) return "<div class='kpi na'><span>" + m.l + "</span><b title='" + naT() + "'>—</b><em class='dl'>" + naT() + "</em><div class='bm'><small>" + naT() + "</small></div></div>";
   var on = afOn(k), sp = splOn(k), mix = k === "acts" && on, okb = cur.afs || 0, miss = Math.max(0, (cur.afb || 0) - okb), v = mv(k, cur), p = prev ? mv(k, prev) : null, t = tgt(k), can = m.t || ADD.indexOf(k) > -1, hasAf = afCan(c) && AFK.indexOf(k) > -1;
   var h = "<div class='kpi" + (on ? " af" : "") + (hasAf ? " hasaf" : "") + "'>" + (hasAf ? "<button type='button' class='afb' data-afk='" + k + "' aria-pressed='" + on + "' title='" + (on ? "AppsFlyer data. Click to show " + NAME[c] + " data" : "Click to show AppsFlyer data") + "'>" + (on ? AFI : AFB) + "</button>" : "") + "<span>" + m.l + "</span>" + "<b" + (mix || sp ? " class='mix'" : "") + " title='" + fmFull(m.u, v) + (mix ? " (success " + fmFull("n", okb) + ", failed " + fmFull("n", miss) + ")" : "") + "'>" + (mix ? "<span class='n'>" + fm(m.u, v) + "</span> <small>(success " + N(okb) + ", failed " + N(miss) + ")</small>" : sp ? "<span class='n'>" + fm(m.u, v) + "</span> " + splHtml(cur, k, m.u) : fm(m.u, v)) + "</b>";
   if (prev && v != null && p) {
@@ -252,7 +256,7 @@ function drillHtml(d) {
     "<button type='button' data-cd='" + d.id + "|up' title='Drill up (" + (i < 2 ? LNAME[LV[i + 1]] : "") + ")'" + (i >= 2 ? " disabled" : "") + ">▲</button>" +
     "<button type='button' data-cd='" + d.id + "|down' title='Drill down (" + (i > 0 ? LNAME[LV[i - 1]] : "") + ")'" + (i <= 0 ? " disabled" : "") + ">▼</button>";
 }
-function chipsInner(d) { var sel = selOf(d, 0); return d.m.map(function (k) { if (na(k)) return "<button type='button' class='chip na' disabled data-cm='" + d.id + "|" + k + "' title='Not available for Google Ads'>" + cl(k) + " —</button>"; return "<button type='button' class='chip" + (sel.indexOf(k) > -1 ? " on" : "") + "' data-cm='" + d.id + "|" + k + "'>" + cl(k) + "</button>"; }).join(""); }
+function chipsInner(d) { var sel = selOf(d, 0); return d.m.map(function (k) { if (na(k)) return "<button type='button' class='chip na' disabled data-cm='" + d.id + "|" + k + "' title='" + naT() + "'>" + cl(k) + " —</button>"; return "<button type='button' class='chip" + (sel.indexOf(k) > -1 ? " on" : "") + "' data-cm='" + d.id + "|" + k + "'>" + cl(k) + "</button>"; }).join(""); }
 function ccHtml(d, cust) {
   var h = "<div class='chart-card' id='cc-" + d.id + "'><div class='chart-head'><h3>" + esc(d.title) + "</h3>" + aflogo(d.id);
   if (d.fun) return h + "</div><div class='fn' id='fn-conv'></div></div>";
@@ -392,7 +396,8 @@ document.addEventListener("click", function (e) {
   var d = o.closest(".dd"), v = o.dataset.v;
   d.dataset.val = v; d.querySelector(".ddb span").textContent = o.textContent;
   d.querySelectorAll(".ddo").forEach(function (x) { x.classList.toggle("on", x === o); }); d.classList.remove("open");
-  if (d.id === "fAud") { S.aud = v; sv();
+  if (d.id === "fArea") { S.area = v; sv();
+  } else if (d.id === "fAud") { S.aud = v; sv();
   } else if (d.id === "tScope") { tsc = v; drawTg();
   } else if (d.id === "fRange") {
     S.range = v; if (v === "custom" && !S.rs) { S.rs = fd(pd(TODAY) - 29 * DAYMS); S.re = TODAY; setDates(); }
@@ -424,7 +429,15 @@ $("#scrim").onclick = closeSb;
 try { if (localStorage.getItem("xpm_col")) document.body.classList.add("col"); } catch (e) {}
 
 /* ---------- pages ---------- */
-function tools() { return "<div class='btns'><button class='btn pri' data-a='add'>Add daily data</button><button class='btn' data-a='csv'>Export CSV</button></div>"; }
+function tools(ch) {
+  var all = ch == null, can = all || shCan(ch);
+  return "<div class='btns'><button class='btn pri' data-a='refresh' data-ch='" + (all ? "all" : ch) + "'" + (can ? "" : " disabled title='Not connected yet'") + ">" + (all ? "Refresh all" : "Refresh") + "</button><button class='btn' data-a='csv'>Export CSV</button></div>";
+}
+function syncAll() { return Promise.all(["meta", "google", "tiktok", "pokkt"].map(function (c) { return sync(c); })); }
+function busy(b, txt, fn) {
+  if (b.disabled) return; var o = b.textContent; b.disabled = true; b.textContent = txt;
+  Promise.resolve().then(fn).then(null, function () {}).then(function () { b.disabled = false; b.textContent = o; });
+}
 
 function blank() { return "<h1>Home</h1>"; }
 
@@ -445,7 +458,7 @@ function targets() {
     h += "<tr><td>" + k[0] + "</td><td class='src'>" + src + "</td><td>" + fT(k[2]) + "</td><td>" + val + "</td><td>" + st + "</td></tr>";
   });
   h += "</table></div><p class='note'>● access ready, ○ waiting on access. Change targets and access in Settings.</p></div>";
-  h += "<div class='card'><h2>Registrations vs pace to " + short(G) + "</h2>" + (hv ? "<div class='cv'><canvas id='c_pace'></canvas></div>" : "<div class='empty'>No data this month. Use Add daily data or sync a channel sheet.</div>") + "</div>";
+  h += "<div class='card'><h2>Registrations vs pace to " + short(G) + "</h2>" + (hv ? "<div class='cv'><canvas id='c_pace'></canvas></div>" : "<div class='empty'>No data this month. Press Refresh all to load the channel sheets.</div>") + "</div>";
   var mxs = 0, by = CH.map(function (c) { var s = add(Z(), {spend:0}).spend; l.filter(function (r) { return r.c === c[0]; }).forEach(function (r) { s += r.spend || 0; }); mxs = Math.max(mxs, s); return [c[1], s]; });
   h += "<div class='card'><h2>Spend by channel</h2>" + (hv ? by.map(function (b) { return "<div class='hb'><span>" + b[0] + "</span><div class='t'><div style='width:" + (mxs ? b[1] / mxs * 100 : 0) + "%'></div></div><b>" + P(b[1]) + "</b></div>"; }).join("") : "<div class='empty'>Spend appears here once you add data.</div>") + "</div>";
   h += "<div class='card'><h2>How data flows</h2><div class='flow'><span class='node r'>App events</span><span class='arr'>›</span><span class='node'>Segment</span><span class='arr'>›</span><div class='stack'><span class='node'>AppsFlyer</span><span class='node'>Amplitude</span><span class='node'>Databricks</span><span class='node'>WebEngage</span></div></div></div>";
@@ -458,23 +471,26 @@ function drawPace() {
 }
 
 /* Ad channel page */
-function afText(ch) { if (!afCan(ch) || !S.metaUrl) return ""; var s = sy(ch + "_af"); return s.err ? " · AppsFlyer: " + s.err : s.at ? " · AppsFlyer " + s.n + " days" : ""; }
+var SEP = " \u00a0·\u00a0 ";
+function stamp(ms) { return new Date(ms).toLocaleString("en-US", {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}).replace(/[\s\u202f]+(AM|PM)/i, "$1"); }
+function dayLab(s) { return s ? new Date(pd(s)).toLocaleDateString("en-US", {month:"short", day:"numeric", year:"numeric", timeZone:"UTC"}) : "—"; }
+function maxDay(l) { var m = ""; l.forEach(function (r) { if (r.d > m) m = r.d; }); return m; }
+function afText(ch) { if (!afCan(ch) || !S.metaUrl) return ""; var s = sy(ch + "_af"); return s.err ? SEP + "AppsFlyer: " + s.err : s.at ? SEP + "AppsFlyer: " + dayLab(s.last || maxDay(AFROWS.filter(function (r) { return r.c === ch; }))) : ""; }
 function syText(ch) { return syBase(ch) + afText(ch); }
 function syBase(ch) {
   ch = ch || "meta"; var st = sy(ch);
   if (!S.metaUrl) return "Not connected. Add the Apps Script web app URL in Integrations to pull the Google Sheet.";
   if (st.err) return st.err;
-  return st.at ? "Google Sheet synced " + new Date(st.at).toLocaleString("en-US", {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}) + " · " + st.n + " days of data" : "Connected. Press Sync sheet to load data.";
+  return st.at ? "Last refresh: " + stamp(st.at) + SEP + "Latest available data: " + dayLab(st.last || maxDay(rows.filter(function (r) { return r.c === ch; }))) : "Connected. Press Refresh to load data.";
 }
 function chan(id) {
-  var h = "<div class='top'><div><h1>" + NAME[id] + "</h1><p class='sub'>" + (acc[id] ? "Access ready" : "Waiting on access") + "</p></div>" + tools() + "</div>";
+  var h = "<div class='top'><div><h1>" + NAME[id] + "</h1><p class='sub" + (sy(id).err ? " err" : "") + "' id='sy-" + id + "'>" + (shCan(id) ? syText(id) : "Not connected yet.") + "</p></div>" + tools(id) + "</div>";
   h += "<div class='tabs'>" + [["acct","Account"],["perf","Performance"],["raw","Raw"]].map(function (t) { return "<button data-t='" + t[0] + "' class='" + (tab === t[0] ? "on" : "") + "'>" + t[1] + "</button>"; }).join("") + "</div>";
-  if (shCan(id)) h += "<div class='card sync" + (sy(id).err ? " err" : "") + "'><span id='sy-" + id + "'>" + syText(id) + "</span><button class='btn' data-a='sync' data-ch='" + id + "'>Sync sheet</button></div>";
-  h += "<div class='filters'><div class='f'><span>Date range</span>" + dd("fRange", RANGES, S.range) + "</div><div class='dates' id='rc'" + (S.range === "custom" ? "" : " hidden") + "><input type='date' data-f='rs' value='" + (S.rs || "") + "' aria-label='Range start'><input type='date' data-f='re' value='" + (S.re || "") + "' aria-label='Range end'></div>";
-  h += "<div class='fx' data-only='acct'" + (tab === "acct" ? "" : " hidden") + "><div class='f'><span>Compare to</span>" + dd("fCmp", CMPS, S.cmp) + "</div><div class='dates' id='cc'" + (S.cmp === "custom" ? "" : " hidden") + "><input type='date' data-f='cs' value='" + (S.cs || "") + "' aria-label='Comparison start'><input type='date' data-f='ce' value='" + (S.ce || "") + "' aria-label='Comparison end'></div>";
-  h += "<div class='f'><span>Audience</span>" + dd("fAud", AUDS, S.aud) + "</div><div class='f'><span>Targets</span>" + swBtn("data-vt='1'", S.vt ? "on" : "off") + "</div><div class='f'><span>AppsFlyer data</span>" + afBtn(id) + "</div></div></div>";
+  h += "<div class='filters'><div class='f'><span>Date range</span>" + dd("fRange", RANGES, S.range) + "<div class='dates' id='rc'" + (S.range === "custom" ? "" : " hidden") + "><input type='date' data-f='rs' value='" + (S.rs || "") + "' aria-label='Range start'><input type='date' data-f='re' value='" + (S.re || "") + "' aria-label='Range end'></div></div>";
+  h += "<div class='fx' data-only='acct'" + (tab === "acct" ? "" : " hidden") + "><div class='f'><span>Compare to</span>" + dd("fCmp", CMPS, S.cmp) + "<div class='dates' id='cc'" + (S.cmp === "custom" ? "" : " hidden") + "><input type='date' data-f='cs' value='" + (S.cs || "") + "' aria-label='Comparison start'><input type='date' data-f='ce' value='" + (S.ce || "") + "' aria-label='Comparison end'></div></div>";
+  h += "<div class='f'><span>Area</span>" + dd("fArea", AREAS, S.area) + "</div><div class='f'><span>Audience</span>" + dd("fAud", AUDS, S.aud) + "</div><div class='f'><span>Targets</span>" + swBtn("data-vt='1'", S.vt ? "on" : "off") + "</div><div class='f'><span>AppsFlyer data</span>" + afBtn(id) + "</div></div></div>";
   h += "<p class='rnote' id='note'></p>";
-  h += "<div data-p='acct'" + (tab === "acct" ? "" : " hidden") + "><div id='cards' class='grid g5'></div><div class='charts' id='charts'>" + chartsHtml() + "</div><p class='note'>Reach is added up across days, so frequency is an estimate on ranges longer than one day. Audience (Driver / Passenger) is not connected yet." + (id === "tiktok" ? " TikTok totals combine app and SKAN: the Android figure is app events and the iOS figure is SKAN." : "") + "</p></div>";
+  h += "<div data-p='acct'" + (tab === "acct" ? "" : " hidden") + "><div id='cards' class='grid g5'></div><div class='charts' id='charts'>" + chartsHtml() + "</div><p class='note'>Reach is added up across days, so frequency is an estimate on ranges longer than one day. Area and Audience (Driver / Passenger) are not connected yet, so figures are not filtered by them." + (id === "tiktok" ? " TikTok totals combine app and SKAN: the Android figure is app events and the iOS figure is SKAN." : "") + "</p></div>";
   h += "<div data-p='perf'" + (tab === "perf" ? "" : " hidden") + "><div class='empty'><b>Performance</b><br>Nothing here yet. Campaign, ad set and ad tables will go in this tab.</div></div>";
   h += "<div data-p='raw'" + (tab === "raw" ? "" : " hidden") + "><div class='card' id='raw'></div></div>";
   h += "<p class='note chnote'>AppsFlyer uses classic attribution.</p>";
@@ -494,7 +510,8 @@ function note() {
   var R = rng(chList()), C = tab === "acct" ? cmpRng(R[0], R[1]) : null;
   n.textContent = fr(R[0], R[1]) + (C ? " vs " + fr(C[0], C[1]) : "");
   var cc = route.slice(3), ao = S.afc[cc] || {};
-  if (afCan(cc) && Object.keys(ao).some(function (k) { return ao[k]; }) && !AFROWS.some(function (r) { return r.c === cc; })) n.textContent += " · No AppsFlyer rows yet. Press Sync sheet.";
+  if (afCan(cc) && Object.keys(ao).some(function (k) { return ao[k]; }) && !AFROWS.some(function (r) { return r.c === cc; })) n.textContent += " · No AppsFlyer rows yet. Press Refresh.";
+  if (cc === "pokkt") n.textContent += fxRate() ? " · Pokkt is in USD, shown in pesos at ₱" + fxRate().toFixed(2) + " per $1." : " · USD to PHP rate unavailable. Press Refresh, or check the FX tab in the sheet.";
 }
 function paint() { if (route.indexOf("ch-") !== 0) return; dirty = {acct: 1, raw: 1}; note(); paintTab(); }
 function paintTab() {
@@ -512,6 +529,7 @@ function paintTab() {
 /* Raw tab: daily entries inside the selected date range, click a header to sort */
 var RC = [["d","Day"],["spend","Amount spent"],["impressions","Impressions"],["reach","Reach"],["clicks","Link clicks"],["installs","App installs"],["regs","Registrations"],["acts","Activations"],["value","Activation value"]];
 function drawRaw() {
+  if (route === "ch-pokkt") { drawRawPk(); return; }
   function rc(r, k, u, t) { return route === "ch-tiktok" ? t + " " + splHtml(r, k, u) : t; }
   var id = route.slice(3), all = rows.filter(function (r) { return r.c === id; }), R = rng(all), a = fd(R[0]), b = fd(R[1]);
   var ls = all.filter(function (r) { return r.d >= a && r.d <= b; }).sort(function (x, y) {
@@ -519,7 +537,19 @@ function drawRaw() {
   });
   $("#raw").innerHTML = "<h2>Raw data<span class='mu'>" + ls.length + " days in range</span></h2>" + (ls.length ? "<div class='wrap rw'><table><tr>" + RC.map(function (c) { return "<th><button type='button' class='sort' data-sk='" + c[0] + "'>" + c[1] + (sk === c[0] ? (sd < 0 ? " ▼" : " ▲") : "") + "</button></th>"; }).join("") + "</tr>" + ls.map(function (r) {
     return "<tr><td>" + r.d + "</td><td>" + P(r.spend || 0) + "</td><td>" + N(r.impressions || 0) + "</td><td>" + N(r.reach || 0) + "</td><td>" + N(r.clicks || 0) + "</td><td>" + rc(r, "installs", "n", N(r.installs || 0)) + "</td><td>" + rc(r, "regs", "n", N(r.regs || 0)) + "</td><td>" + rc(r, "acts", "n", N(r.acts || 0)) + "</td><td>" + rc(r, "value", "p0", has(r.value) ? P(r.value) : "—") + "</td></tr>";
-  }).join("") + "</table></div>" : "<div class='empty'>No data in this range. " + (shCan(id) ? "Change the date range, sync the sheet in Integrations, or use Add daily data." : "Change the date range or use Add daily data.") + "</div>");
+  }).join("") + "</table></div>" : "<div class='empty'>No data in this range. " + (shCan(id) ? "Change the date range or press Refresh." : "This channel is not connected yet.") + "</div>");
+  on("[data-sk]", function (x) { x.onclick = function () { var k = x.dataset.sk; if (sk === k) sd = -sd; else { sk = k; sd = k === "d" ? 1 : -1; } drawRaw(); }; });
+}
+
+var RCP = [["d","Day"],["clicks","Clicks"],["installs","Installs"],["rsucc","Registrations"],["poU","PO per conversion"],["spend","Spend"]];
+function drawRawPk() {
+  var all = rows.filter(function (r) { return r.c === "pokkt"; }), R = rng(all), a = fd(R[0]), b = fd(R[1]);
+  var ls = all.filter(function (r) { return r.d >= a && r.d <= b; }).sort(function (x, y) {
+    var p = x[sk], q = y[sk]; if (sk !== "d") { p = p || 0; q = q || 0; } return (p < q ? -1 : p > q ? 1 : 0) * sd;
+  });
+  $("#raw").innerHTML = "<h2>Raw data<span class='mu'>" + ls.length + " days in range</span></h2>" + (ls.length ? "<div class='wrap rw'><table><tr>" + RCP.map(function (c) { return "<th><button type='button' class='sort' data-sk='" + c[0] + "'>" + c[1] + (sk === c[0] ? (sd < 0 ? " ▼" : " ▲") : "") + "</button></th>"; }).join("") + "</tr>" + ls.map(function (r) {
+    return "<tr><td>" + r.d + "</td><td>" + N(r.clicks || 0) + "</td><td>" + N(r.installs || 0) + "</td><td>" + N(r.rsucc || 0) + "</td><td>" + fm("p2", (r.poU || 0) * fxRate()) + "</td><td>" + fm("p2", r.spend || 0) + "</td></tr>";
+  }).join("") + "</table></div>" : "<div class='empty'>No data in this range. Change the date range or press Refresh.</div>");
   on("[data-sk]", function (x) { x.onclick = function () { var k = x.dataset.sk; if (sk === k) sd = -sd; else { sk = k; sd = k === "d" ? 1 : -1; } drawRaw(); }; });
 }
 
@@ -544,7 +574,7 @@ function tgHtml() {
 function drawTg() { var b = $("#tgb"); if (b) { b.innerHTML = tgHtml(); wire(); } }
 function tadd() { var d = $("#tAdd"); if (!d || tsc === "all") return; TC[tsc] = TC[tsc] || {}; TC[tsc][d.dataset.val] = null; sv(); drawTg(); }
 function settings() {
-  var h = "<div class='top'><div><h1>Settings</h1><p class='sub'>Saved automatically in this browser.</p></div></div>";
+  var h = "<div class='top'><div><h1>Settings</h1><p class='sub'>Saved automatically in this browser.</p></div><div class='btns'><button class='btn pri' data-a='syncall'>Sync all</button></div></div>";
   h += "<div class='card'><h2>Appearance</h2><div class='tabs' style='margin:0'>" + [["system","System"],["light","Light"],["dark","Dark"]].map(function (t) { return "<button data-th='" + t[0] + "' class='" + (theme === t[0] ? "on" : "") + "'>" + t[1] + "</button>"; }).join("") + "</div></div>";
   h += "<div class='card'><h2>Targets</h2><div class='sel'><span class='note'>Applies to</span>" + dd("tScope", [["all","All channels"]].concat(CH), tsc) + "</div><div id='tgb'>" + tgHtml() + "</div></div>";
   h += "<div class='card'><h2>Tool access</h2><p class='note' style='margin-top:-6px'>Marks each tool as ready or waiting on the Targets page. Tap to switch.</p><div class='btns'>" + CH.concat(DT, [["webengage","WebEngage"]]).map(function (c) { return "<button class='chip " + (acc[c[0]] ? "good" : "") + "' data-acc='" + c[0] + "'>" + c[1] + ": " + (acc[c[0]] ? "ready" : "waiting") + "</button>"; }).join("") + "</div></div>";
@@ -560,9 +590,10 @@ function integrations() {
   var h = "<div class='top'><div><h1>Integrations</h1><p class='sub'>Where the data comes from. Google Sheets today, direct APIs later.</p></div></div>";
   h += "<h2 class='gt'>Google Sheets</h2><div class='card'><h2>Connection<span class='mu'>one web app for every sheet</span></h2><div class='cf'><label>Apps Script web app URL<input type='text' data-s='metaUrl' value='" + (S.metaUrl || "").replace(/'/g, "&#39;") + "' placeholder='https://script.google.com/macros/s/.../exec' autocomplete='off'></label><label>Token (only if you set one in Code.gs)<input type='password' data-s='metaToken' value='" + (S.metaToken || "").replace(/'/g, "&#39;") + "' autocomplete='off'></label></div><div class='btns'><button class='chip " + (S.autoSync !== false ? "good" : "") + "' data-auto='1'>Sync when the app opens: " + (S.autoSync !== false ? "on" : "off") + "</button></div></div>";
   h += "<h2 class='gt'>Channels</h2>";
-  [["google", "Google Ads", "green", "Automatic via Script"], ["meta", "Meta Ads", "orange", "Manual Update"], ["tiktok", "TikTok Ads", "orange", "Manual Update"]].forEach(function (c) {
+  [["google", "Google Ads", "green", "Automatic via Script"], ["meta", "Meta Ads", "orange", "Manual Update"], ["tiktok", "TikTok Ads", "orange", "Manual Update"], ["pokkt", "Pokkt", "orange", "Manual Update"]].forEach(function (c) {
     h += "<div class='card sync" + (sy(c[0]).err ? " err" : "") + "'><div><b>" + c[1] + "</b>" + lamp(c[2], c[3]) + "<p class='note' style='margin:2px 0' id='sy-" + c[0] + "'>" + syText(c[0]) + "</p></div><button class='btn pri' data-a='sync' data-ch='" + c[0] + "'>Sync now</button></div>";
   });
+  h += "<div class='card sync'><div><b>Pokkt currency</b><p class='note' style='margin:2px 0' id='fxn'>" + fxText() + "</p></div></div>";
   h += "<div class='card sync'><div><b>AppsFlyer</b>" + lamp("orange", "Manual Update") + "<p class='note' style='margin:2px 0' id='sy-appsflyer'>" + afAllText() + "</p></div><button class='btn pri' data-a='sync' data-ch='appsflyer'>Sync now</button></div>";
   CH.filter(function (c) { return !shCan(c[0]); }).forEach(function (c) {
     h += "<div class='card sync off'><div><b>" + c[1] + "</b>" + lamp("gray", "Not Connected") + "</div></div>";
@@ -582,14 +613,15 @@ function render() {
 function wire() {
   on("[data-a]", function (b) { b.onclick = function () {
     var a = b.dataset.a;
-    if (a === "add") form(); else if (a === "csv") csv(); else if (a === "sync") sync(b.dataset.ch || "meta"); else if (a === "tadd") tadd();
+    if (a === "refresh") busy(b, "Refreshing…", function () { return b.dataset.ch === "all" ? syncAll() : sync(b.dataset.ch); }); else if (a === "syncall") busy(b, "Syncing…", syncAll);
+    else if (a === "csv") csv(); else if (a === "sync") sync(b.dataset.ch || "meta"); else if (a === "tadd") tadd();
     else if (a === "reset") { T = Object.assign({}, TD); sv(); render(); }
   }; });
   on("[data-t]", function (b) { b.onclick = function () { setTab(b.dataset.t); }; });
   on("[data-th]", function (b) { b.onclick = function () { theme = b.dataset.th; applyTheme(); sv(); render(); }; });
   on("[data-acc]", function (b) { b.onclick = function () { var k = b.dataset.acc; acc[k] = acc[k] ? 0 : 1; sv(); b.className = "chip " + (acc[k] ? "good" : ""); b.textContent = NAME[k] + ": " + (acc[k] ? "ready" : "waiting"); }; });
   on("[data-tk]", function (i) { i.oninput = function () { T[i.dataset.tk] = i.value === "" ? null : +i.value; sv(); }; });
-  on("[data-s]", function (i) { i.oninput = function () { S[i.dataset.s] = i.value.trim(); sv(); ["meta", "google", "tiktok"].forEach(setSy); }; });
+  on("[data-s]", function (i) { i.oninput = function () { S[i.dataset.s] = i.value.trim(); sv(); ["meta", "google", "tiktok", "pokkt"].forEach(setSy); }; });
   on("[data-vt]", function (b) { b.onclick = function () { S.vt = !S.vt; sv(); swSet(b, S.vt ? "on" : "off"); var c = $("#cards"); if (c) c.classList.toggle("vt", !!S.vt); }; });
   on("[data-bt]", function (b) { b.onclick = function () { var p = b.dataset.bt.split("|"); CS.types[p[0]] = p[1]; sv(); b.parentNode.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); }); }; });
   var chs = $("#charts"); if (chs) chs.onclick = chartClick;
@@ -603,49 +635,45 @@ function wire() {
 function applyTheme() { var h = document.documentElement; if (theme === "system") h.removeAttribute("data-theme"); else h.setAttribute("data-theme", theme); }
 
 /* ---------- data: entry form, CSV, Google Sheet ---------- */
-function form() {
-  var cur = route.indexOf("ch-") === 0 ? route.slice(3) : "google";
-  function num(id, l, req) { return "<label>" + l + "<input type='number' id='" + id + "' min='0' step='any' " + (req ? "required" : "value='0'") + "></label>"; }
-  $("#modal").innerHTML = "<div class='modal'><form id='f'><h2>Add daily data</h2><label>Channel" + dd("fc", CH, cur) + "</label><label>Date<input type='date' id='fd' value='" + TODAY + "' required></label><div class='two'>" + num("fs", "Spend (₱)", 1) + num("fi", "Installs", 1) + num("fr", "Registrations", 1) + num("fa", "Activations") + num("fm", "Impressions") + num("fe", "Reach") + "</div>" + num("fk", "Link clicks") + "<div class='btns'><button class='btn pri' type='submit'>Save</button><button class='btn' type='button' id='x'>Cancel</button></div><p class='note'>Saving the same channel and date again replaces the entry.</p></form></div>";
-  $("#x").onclick = function () { $("#modal").innerHTML = ""; };
-  $("#f").onsubmit = function (e) {
-    e.preventDefault();
-    var r = {c:$("#fc").dataset.val, d:$("#fd").value, spend:+$("#fs").value, installs:+$("#fi").value, regs:+$("#fr").value, acts:+$("#fa").value, impressions:+$("#fm").value, reach:+$("#fe").value, clicks:+$("#fk").value};
-    rows = rows.filter(function (x) { return !(x.c === r.c && x.d === r.d); }); rows.push(r); sv(); $("#modal").innerHTML = ""; render();
-  };
-}
 function csv() {
   var t = "channel,date,spend,impressions,reach,clicks,installs,registrations,activations\n" + rows.map(function (r) { return [r.c, r.d, r.spend, r.impressions || 0, r.reach || 0, r.clicks || 0, r.installs, r.regs, r.acts].join(","); }).join("\n");
   var a = document.createElement("a"); a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(t); a.download = "xpress-marketing-data.csv"; a.click();
 }
+function fxRate() { return has(S.fx) && +S.fx > 0 ? +S.fx : 0; }
+function fxText() { return fxRate() ? "USD to PHP: ₱" + fxRate().toFixed(4) + ". Read from Google Sheets (GOOGLEFINANCE) at the last Pokkt refresh." : "The USD to PHP rate loads on the next Pokkt refresh."; }
+/* Pokkt reports in USD: usd = spend, poU = PO price per conversion. Both are shown in pesos at the sheet's current rate. */
+function pk(x, fx) { var u = x.spendUsd || 0; return {c:"pokkt", sh:1, d:x.day, clicks:x.clicks, installs:x.installs, regs:x.registrationSuccess, rsucc:x.registrationSuccess, poU:x.po || 0, usd:u, spend:u * fx}; }
 function syncAf(ch) {
-  if (!S.metaUrl) return;
+  if (!S.metaUrl) return Promise.resolve();
   var k = ch + "_af", u = S.metaUrl + (S.metaUrl.indexOf("?") > -1 ? "&" : "?") + "source=" + k + "&t=" + Date.now() + (S.metaToken ? "&token=" + encodeURIComponent(S.metaToken) : "");
-  fetch(u).then(function (r) { return r.json(); }).then(function (j) {
+  return fetch(u).then(function (r) { return r.json(); }).then(function (j) {
     if (!j || !j.ok) throw new Error((j && j.error) || "The script returned an error");
     if (j.source !== k) throw new Error("Redeploy Code.gs as a new version so it can read the AF tabs");
     AFROWS = AFROWS.filter(function (r) { return r.c !== ch; });
     j.rows.forEach(function (x) { AFROWS.push({c: ch, d: x.day, afi: x.installs, afr: x.registrations, afb: x.bookings, afs: x.rides, afv: x.revenue}); });
-    SY[k] = {at: Date.now(), n: j.rows.length, err: ""}; sv(); setSy(ch); if (route === "ch-" + ch) paint();
+    SY[k] = {at: Date.now(), n: j.rows.length, last: j.rows.length ? j.rows[j.rows.length - 1].day : "", err: ""}; sv(); setSy(ch); if (route === "ch-" + ch) paint();
   }).catch(function (e) { sy(k).err = e.message; sv(); setSy(ch); });
 }
 function sync(ch) {
-  if (ch === "appsflyer") { var as = $("#sy-appsflyer"); if (as) as.textContent = "Syncing…"; syncAf("google"); syncAf("meta"); return; }
+  if (ch === "appsflyer") { var as = $("#sy-appsflyer"); if (as) as.textContent = "Syncing…"; return Promise.all([syncAf("google"), syncAf("meta")]); }
   ch = ch || "meta";
-  if (afCan(ch)) syncAf(ch);
-  if (!S.metaUrl) { sy(ch).err = "Add the Apps Script web app URL in Integrations first."; sv(); setSy(ch); return; }
+  if (!shCan(ch)) return Promise.resolve();
+  var afp = afCan(ch) ? syncAf(ch) : Promise.resolve();
+  if (!S.metaUrl) { sy(ch).err = "Add the Apps Script web app URL in Integrations first."; sv(); setSy(ch); return afp; }
   var s = $("#sy-" + ch); if (s) s.textContent = "Syncing…";
   var u = S.metaUrl + (S.metaUrl.indexOf("?") > -1 ? "&" : "?") + "source=" + ch + "&t=" + Date.now() + (S.metaToken ? "&token=" + encodeURIComponent(S.metaToken) : "");
-  fetch(u).then(function (r) { return r.json(); }).then(function (j) {
+  var p = fetch(u).then(function (r) { return r.json(); }).then(function (j) {
     if (!j || !j.ok) throw new Error((j && j.error) || "The script returned an error");
     if (j.source !== ch) throw new Error("Redeploy Code.gs as a new version so it can read the " + NAME[ch] + " tab");
+    var fx = 0; if (ch === "pokkt") { if (j.fx > 0) S.fx = j.fx; fx = fxRate(); }
     rows = rows.filter(function (r) { return !(r.c === ch && r.sh); });
-    j.rows.forEach(function (x) { rows.push({c:ch, sh:1, d:x.day, spend:x.spend, impressions:x.impressions, reach:x.reach, clicks:x.clicks, installs:x.installs, regs:x.registrations, acts:x.purchases, value:x.purchasesValue, ina:x.installsApp, ins:x.installsSkan, rga:x.registrationsApp, rgs:x.registrationsSkan, aca:x.purchasesApp, acs:x.purchasesSkan, vaa:x.purchasesValueApp, vas:x.purchasesValueSkan}); });
-    SY[ch] = {at:Date.now(), n:j.rows.length, err:""}; sv();
+    j.rows.forEach(function (x) { if (ch === "pokkt") { rows.push(pk(x, fx)); return; } rows.push({c:ch, sh:1, d:x.day, spend:x.spend, impressions:x.impressions, reach:x.reach, clicks:x.clicks, installs:x.installs, regs:x.registrations, acts:x.purchases, value:x.purchasesValue, ina:x.installsApp, ins:x.installsSkan, rga:x.registrationsApp, rgs:x.registrationsSkan, aca:x.purchasesApp, acs:x.purchasesSkan, vaa:x.purchasesValueApp, vas:x.purchasesValueSkan}); });
+    SY[ch] = {at:Date.now(), n:j.rows.length, last:j.rows.length ? j.rows[j.rows.length - 1].day : "", err:""}; sv();
     if (route === "targets") render(); else { setSy(ch); if (route === "ch-" + ch) paint(); }
   }).catch(function (e) { sy(ch).err = "Could not load the sheet (" + e.message + "). In Apps Script, deploy as a web app with access set to Anyone, and paste the /exec URL."; sv(); setSy(ch); });
+  return Promise.all([afp, p]);
 }
-function setSy(ch) { afSy(); var s = $("#sy-" + ch); if (s) { s.textContent = syText(ch); var c = s.closest(".sync"); if (c) c.classList.toggle("err", !!sy(ch).err); } }
+function setSy(ch) { afSy(); var s = $("#sy-" + ch); if (s) { s.textContent = syText(ch); if (s.classList.contains("sub")) s.classList.toggle("err", !!sy(ch).err); var fn = $("#fxn"); if (fn) fn.textContent = fxText(); var c = s.closest(".sync"); if (c) c.classList.toggle("err", !!sy(ch).err); } }
 
 /* ---------- start ---------- */
 /* ---------- login gate ----------
@@ -658,14 +686,20 @@ function verify(url, token) {
     if (!j || !j.ok) throw new Error(j && /token/i.test(j.error || "") ? "Incorrect token." : ((j && j.error) || "The script returned an error."));
   }, function () { throw new Error("Could not reach the server. Check the web app URL and your connection."); });
 }
+/* Remember me: a ticked box keeps the session for 7 days. Unticked, the sign-in lasts until the tab or browser is closed. */
+var REM = 7 * DAYMS;
+function remOk() { try { return +localStorage.getItem("xpm_rem") > Date.now(); } catch (e) { return false; } }
+function sessOk() { try { return !!sessionStorage.getItem("xpm_sess"); } catch (e) { return false; } }
+function setRem(on) { try { if (on) localStorage.setItem("xpm_rem", String(Date.now() + REM)); else localStorage.removeItem("xpm_rem"); sessionStorage.setItem("xpm_sess", "1"); } catch (e) {} }
 function unlock() {
   locked = false; document.body.classList.remove("locked"); $("#login").innerHTML = "";
   render();
-  if (S.metaUrl && S.autoSync !== false) { sync("meta"); sync("google"); sync("tiktok"); }
+  if (S.metaUrl && S.autoSync !== false) syncAll();
 }
 function signOut() {
   S.metaToken = ""; rows = []; AFROWS = []; SY = {};
   try { localStorage.removeItem("xpm_rows"); localStorage.removeItem("xpm_afrows"); localStorage.removeItem("xpm_sync"); } catch (e) {}
+  try { localStorage.removeItem("xpm_rem"); sessionStorage.removeItem("xpm_sess"); } catch (e) {}
   sv(); killCharts(); locked = true; $("#main").innerHTML = ""; $("#modal").innerHTML = "";
   document.body.classList.add("locked"); showLogin("");
 }
@@ -674,6 +708,7 @@ function showLogin(msg, busy) {
   $("#login").innerHTML = "<form class='lg' id='lgf' autocomplete='off'><img class='logo l' src='xpress-logo.png' alt='Xpress'><img class='logo d' src='xpress-logo-dark.png' alt='Xpress'><h1>Xpress Marketing</h1><p>" + (busy ? "Checking access…" : "Enter your access token to continue.") + "</p>" +
     (needUrl ? "<label>Apps Script web app URL<input type='text' id='lgu' placeholder='https://script.google.com/macros/s/.../exec' autocapitalize='off' spellcheck='false'></label>" : "") +
     "<label>Access token<span class='pw'><input type='password' id='lgt' autocapitalize='off' spellcheck='false'" + (busy ? " disabled" : "") + "><button type='button' id='lgs'>Show</button></span></label>" +
+    "<label class='rm'><input type='checkbox' id='lgr'" + (S.remember === false ? "" : " checked") + (busy ? " disabled" : "") + "> Remember me for 7 days</label>" +
     "<div class='err' id='lge' role='alert'>" + esc(msg || "") + "</div><button class='btn pri' type='submit' id='lgb'" + (busy ? " disabled" : "") + ">" + (busy ? "Checking…" : "Sign in") + "</button>" +
     (needUrl ? "<p class='fine'>Saved on this device after you sign in.</p>" : "") + "</form>";
   var t = $("#lgt"); if (t && !busy) t.focus();
@@ -686,7 +721,7 @@ function showLogin(msg, busy) {
     if (!tok) { er.textContent = "Enter the access token."; return; }
     btn.disabled = true; btn.textContent = "Checking…"; er.textContent = "";
     verify(url, tok).then(function () {
-      fails = 0; S.metaUrl = url; S.metaToken = tok; sv(); unlock();
+      fails = 0; var rm = $("#lgr").checked; S.remember = rm; S.metaUrl = url; S.metaToken = tok; setRem(rm); sv(); unlock();
     }, function (err) {
       if (err.message === "Incorrect token." && ++fails >= 5) { lockUntil = Date.now() + 30000; fails = 0; err = new Error("Too many attempts. Try again in 30s."); }
       btn.disabled = false; btn.textContent = "Sign in"; er.textContent = err.message; t.value = ""; t.focus();
@@ -695,7 +730,8 @@ function showLogin(msg, busy) {
 }
 addEventListener("hashchange", function () { if (!locked) { render(); scrollTo(0, 0); } });
 applyTheme();
-if (S.metaUrl && S.metaToken) {
+if (S.metaUrl && S.metaToken && !remOk() && !sessOk()) { S.metaToken = ""; sv(); showLogin(""); }
+else if (S.metaUrl && S.metaToken) {
   showLogin("", true);
   verify(S.metaUrl, S.metaToken).then(unlock, function (err) { S.metaToken = ""; sv(); showLogin(err.message); });
 } else showLogin("");
